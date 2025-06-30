@@ -6,10 +6,11 @@ use App\Models\Alumno;
 use App\Models\Carrera;
 use App\Models\Configuracion;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 class AlumnoRepository{
 
-    public $config; 
+    public $config;
     public $availableFiels = ['alumno','dni','email','ciudad','telefono1'];
 
     public function __construct() {
@@ -19,7 +20,7 @@ class AlumnoRepository{
     function index($request){
         $idsQuery = Alumno::select('alumnos.id')
         ->leftJoin('egresadoinscripto', 'egresadoinscripto.id_alumno', '=', 'alumnos.id')
-        ->leftJoin('carreras','carreras.id', '=', 'egresadoinscripto.id_carrera'); 
+        ->leftJoin('carreras','carreras.id', '=', 'egresadoinscripto.id_carrera');
 
         if($request->has('filter_carrera_id') && $request->input('filter_carrera_id') != 0){
             $idsQuery->where('egresadoinscripto.id_carrera', $request->input('filter_carrera_id'));
@@ -37,22 +38,45 @@ class AlumnoRepository{
             if($request->input('filter_field') == 'alumno'){
                 $word = str_replace(' ','%',$request->input('filter_search_box'));
                 $idsQuery->whereRaw("(CONCAT(alumnos.nombre,' ',alumnos.apellido) LIKE '%$word%' OR (CONCAT(alumnos.apellido,' ',alumnos.nombre) LIKE '%$word%'))");
-            }else{ 
+            }else{
                 $idsQuery->where($request->input('filter_field'), 'LIKE', '%'.$request->input('filter_search_box').'%');
             }
-            
+
         }
+
+        if($request->has('filter_titulo') && $request->input('filter_titulo') != 0){
+           $idsQuery->where('alumnos.titulo', $request->input('filter_titulo'));
+        }
+
 
         $ids = $idsQuery->distinct()->get()->pluck('id');
 
-        $alumnos = Alumno::select('alumnos.*')->whereIn('alumnos.id', $ids)
-        ->orderBy('nombre')
-        ->orderBy('apellido')
-        ->paginate($this->config['filas_por_tabla']); 
+        $query = Alumno::select('alumnos.*')
+            ->whereIn('alumnos.id', $ids);
 
-        
-        return $alumnos;
-
+        $query->orderBy('apellido')->orderBy('nombre');
+        return $query->paginate($this->config['filas_por_tabla']);
     }
 
+    // agregar una institucion secundaraia a un alumno
+    public function agregarInstitucionSecundaria(string $nombre): Alumno
+    {
+        return Alumno::create([
+            'nombre_institucion_secundaria' => $nombre
+        ]);
+    }
+
+    //actualizr una institucion secundaria de un alumno
+    public function actualizarInstitucionSecundaria(int $id, string $nuevoNombre): ?Alumno
+    {
+        $alumno = Alumno::query()->find($id);
+        if (!$alumno){
+            return null;
+        }
+
+        $alumno->nombre_institucion_secundaria = $nuevoNombre;
+        $alumno->save();
+
+        return $alumno;
+    }
 }

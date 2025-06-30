@@ -35,6 +35,7 @@ class Alumno extends Authenticatable implements MustVerifyEmail
         'piso' ,
         'estado_civil' ,
         'email',
+        'nombre_institucion_secundario',
         'titulo_anterior' ,
         'becas',
         'observaciones',
@@ -42,7 +43,8 @@ class Alumno extends Authenticatable implements MustVerifyEmail
         'telefono2' ,
         'telefono3',
         'codigo_postal',
-        'password'
+        'password',
+        'titulo'
     ];
 
     /**
@@ -86,7 +88,7 @@ class Alumno extends Authenticatable implements MustVerifyEmail
         }else{
             return 'Otro';
         }
-        
+
     }
 
     public function cursadas(){
@@ -104,7 +106,7 @@ class Alumno extends Authenticatable implements MustVerifyEmail
             ->leftJoin('egresadoinscripto', 'egresadoinscripto.id_carrera','carreras.id')
             ->where('egresadoinscripto.id_alumno',$alumno)
             ->get();
-        
+
     }
 
     public function examenes(){
@@ -124,7 +126,7 @@ class Alumno extends Authenticatable implements MustVerifyEmail
     public function nombreApellido(){
         return $this->nombre.' '.$this->apellido;
     }
-    
+
     public function apellidoNombre(){
         return $this->apellido.' '.$this->nombre;
     }
@@ -140,7 +142,7 @@ class Alumno extends Authenticatable implements MustVerifyEmail
     public function iniciales(){
         return "{$this->nombre[0]}.{$this->apellido[0]}.";
     }
-    
+
     public function setEmailAttribute($value)
     {
         $this->attributes['email'] = strtolower($value);
@@ -181,4 +183,20 @@ class Alumno extends Authenticatable implements MustVerifyEmail
         }
         return $ciudades;
     }
+
+    // FIXME: fijate que esto no anda y tira error en la parte de editar alumno, te lo dejo en un comentario por el momento asi no jode y dsp create una rama para arreglarlo
+   /**  public function titulo(){
+        $titulo = [
+            'Fotocopia del título original secundario',
+            'Certificado de constancia de título en trámite',
+            'Constancia de alumno del último año del nivel secundario',
+            'No entregado'];
+        if(isset($titulo [$this->titulo])){
+            return $titulo [$this->titulo];
+        }else{
+            return 'Otro';
+        }
+    }
+    */
 }
+

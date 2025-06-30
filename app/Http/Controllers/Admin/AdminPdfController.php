@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Asignatura;
 use App\Models\Alumno;
 use App\Models\Cursada;
 use App\Models\Examen;
 use App\Models\Mesa;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon;
+use function Spatie\LaravelPdf\Support\pdf;
+use App\Services\Admin\CursadaRegularService;
+
 use Illuminate\Http\Request;
 
 class AdminPdfController extends Controller
@@ -67,7 +71,7 @@ class AdminPdfController extends Controller
 
         // Todos los registros de alumnos en esa mesa
         $examenes = Examen::where('id_mesa', $mesa->id)->get();
-        
+
         // para cada registro
         foreach ($examenes as $examen) {
 
@@ -86,5 +90,16 @@ class AdminPdfController extends Controller
 
         $pdf = Pdf::loadView('pdf.acta-volante', ['alumnos' => $alumnos,'mesa' => $mesa,'condicion'=>'LIBRE']);
         return $pdf->stream('acta-volante.pdf');
+    }
+    public function constanciaRegular(Alumno $alumno){
+        $regular = new CursadaRegularService($alumno, config('app'));
+        if (!$regular->esCursadaRegular()) {
+            return redirect()->back()->with('aviso', 'El alumno no tiene condicion de regular');
+        }
+        $fecha = Carbon\Carbon::now();
+        return pdf()
+        ->view('Pdf.alumno-regular', compact('alumno') + ['fecha' => $fecha])
+        ->name('constancia-regular.pdf');
+        //->download();
     }
 }
