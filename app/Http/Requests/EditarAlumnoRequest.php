@@ -11,7 +11,7 @@ class EditarAlumnoRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return \true;
+        return true;
     }
 
     /**
@@ -23,23 +23,26 @@ class EditarAlumnoRequest extends FormRequest
     {
         return [
             'dni' => ['required','numeric','max:999999999'],
-            'nombre' => ['required','regex:/[a-zA-Z0-9\s]+/'],
-            'apellido' => ['required','regex:/[a-zA-Z0-9\s]+/'],
+            'nombre' => ['required', 'regex:/^[a-zA-Z]+$/'],
+            'apellido' => ['required', 'regex:/^[a-zA-Z]+$/'],
             'fecha_nacimiento' => ['required','date','before:now'],
-            'ciudad' => ['nullable'],
-            'calle' => ['nullable'],
+            'ciudad' => ['nullable', 'regex:/^[\pL\pN\s]+$/u'],
+            'calle' => ['nullable', 'regex:/^[\pL]+$/u'],
             'casa_numero' => ['nullable','numeric','max:100000'],
             'dpto' => ['nullable'],
             'piso' => ['nullable'],
             'estado_civil' => ['required'],
             'email' => ['nullable'],
-            'titulo_anterior' => ['nullable'],
+            'nombre_institucion_secundario' => ['required','string','max:255','regex:/^[A-Za-záéíóúÁÉÍÓÚÑñ\s\d]+$/'],
+            'titulo_anterior' => ['nullable', 'regex:/^[\pL\s]+$/u'],
             'becas' => ['nullable'],
             'observaciones' => ['nullable'],
             'telefono1' => ['nullable','numeric'],
             'telefono2' => ['nullable','numeric'],
             'telefono3' => ['nullable','numeric'],
-            'codigo_postal' => ['nullable','alpha_num']
+            'codigo_postal' => ['nullable','alpha_num'],
+            'estado' => ['nullable'],
+            'titulo_secundario' => ['required']
         ];
     }
     public function messages()
