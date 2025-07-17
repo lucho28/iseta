@@ -12,40 +12,42 @@ use Illuminate\Http\Request;
 
 class AsignaturasCrudController extends Controller
 {
-    
+
     function __construct()
     {
-        $this -> middleware('auth:admin');
+        $this->middleware('auth:admin');
     }
 
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
-    {       
-         $asignaturas = [];
-         $filtro = "";
-         $porPagina = Configuracion::get('filas_por_tabla',true);
+    {
+        $asignaturas = [];
+        $filtro = "";
+        $porPagina = Configuracion::get('filas_por_tabla', true);
 
 
-        if($request->has('filtro')){
+        if ($request->has('filtro')) {
             $filtro = $request->filtro;
 
-            if(strpos($filtro, ':')){
-                $arr = explode(':',$filtro);
+            if (strpos($filtro, ':')) {
+                $arr = explode(':', $filtro);
                 $campo = $arr[0];
                 $keyword = $arr[1];
-                $asignaturas = Asignatura::where($campo,'LIKE','%'.$keyword.'%') -> paginate($porPagina);
-            }else{
-                
-                $asignaturas = Asignatura::where('nombre','LIKE','%'.$filtro.'%')
-                    -> paginate($porPagina);
-            }   
-        }else{
+                $asignaturas = Asignatura::where($campo, 'LIKE', '%' . $keyword . '%')->paginate($porPagina);
+            } else {
+
+                $asignaturas = Asignatura::where('nombre', 'LIKE', '%' . $filtro . '%')
+                    ->paginate($porPagina);
+            }
+        } else {
             $asignaturas = Asignatura::select('*')->with('carrera')->paginate($porPagina);
         }
-        return view('Admin.Asignaturas.index',['asignaturas'=>$asignaturas, 'filtro'=>$filtro]);
+        return view('Admin.Asignaturas.index', ['asignaturas' => $asignaturas, 'filtro' => $filtro]);
     }
+
+
 
     /**
      * Show the form for creating a new resource.
@@ -53,9 +55,9 @@ class AsignaturasCrudController extends Controller
     public function create(Request $request)
     {
         $carreras = Carrera::orderBy('nombre')->get();
-        return view('Admin.Asignaturas.create',[
-            'carreras'=>$carreras,
-            'id_carrera'=>$request->id_carrera? $request->id_carrera:null 
+        return view('Admin.Asignaturas.create', [
+            'carreras' => $carreras,
+            'id_carrera' => $request->id_carrera ? $request->id_carrera : null
         ]);
     }
 
@@ -66,14 +68,9 @@ class AsignaturasCrudController extends Controller
     {
         $data = $request->validated();
 
-        if(!Carrera::where('id', $data['id_carrera'])->exists()){
-            return redirect()->back()->with('error','La carrera seleccionada no existe'); 
-        }
-
-
         Asignatura::create($data);
 
-        return redirect()->back()->with('mensaje','Se creo la asignatura');
+        return redirect()->back()->with('mensaje', 'Se creo la asignatura');
     }
 
 
@@ -82,19 +79,12 @@ class AsignaturasCrudController extends Controller
      */
     public function edit(Request $request, $asignatura)
     {
-        $config=Configuracion::todas();
+        Configuracion::todas();
 
-            $asignatura = Asignatura::with('cursadas.alumno')->find($asignatura);
-
-            $alumnos = $asignatura->cursantes();
-
-            $correlativas = Asignatura::where('id_carrera', $asignatura->carrera->id)
-                ->where('anio', '>=', $asignatura->anio);
-
+        $asignatura = Asignatura::with('cursadas.alumno')->find($asignatura);
 
         return view('Admin.Asignaturas.edit', [
             'asignatura' => $asignatura,
-            // 'alumnos' => $alumnos
         ]);
     }
 
@@ -106,13 +96,10 @@ class AsignaturasCrudController extends Controller
         $data = $request->validated();
         $asignatura->update($data);
 
-        if($request->has('redirect'))
-            return redirect()->to($request->input('redirect'))->with('mensaje','Se edito la asignatura');
+        if ($request->has('redirect'))
+            return redirect()->to($request->input('redirect'))->with('mensaje', 'Se edito la asignatura');
         else
-            return redirect()->back()->with('mensaje','Se edito la asignatura');
-        
-
-        //return redirect()->back()->with('mensaje','Se edito la asignatura');
+            return redirect()->back()->with('mensaje', 'Se edito la asignatura');
     }
 
     /**
@@ -121,6 +108,6 @@ class AsignaturasCrudController extends Controller
     public function destroy(Asignatura $asignatura)
     {
         $asignatura->delete();
-        return redirect() -> route('admin.carreras.edit',['carrera' => $asignatura->id_carrera]) -> with('mensaje', 'Se ha eliminado la asignatura');
+        return redirect()->route('admin.carreras.edit', ['carrera' => $asignatura->id_carrera])->with('mensaje', 'Se ha eliminado la asignatura');
     }
 }

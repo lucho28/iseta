@@ -3,14 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BaseController;
-use App\Http\Controllers\Controller;
 use App\Http\Requests\CrearCarreraRequest;
 use App\Http\Requests\EditarCarreraRequest;
 use App\Models\Carrera;
-use App\Models\Configuracion;
+use App\Models\Asignatura;
 use App\Repositories\Admin\CarreraRepository;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class CarrerasCrudController extends BaseController
 {
@@ -21,7 +20,8 @@ class CarrerasCrudController extends BaseController
 
     public $carreraRepo;
 
-    public function __construct(CarreraRepository $carreraRepo) {
+    public function __construct(CarreraRepository $carreraRepo)
+    {
         parent::__construct();
         $this->carreraRepo = $carreraRepo;
     }
@@ -30,10 +30,10 @@ class CarrerasCrudController extends BaseController
      * Display a listing of the resource.
      */
     public function index(Request $request)
-    {       
+    {
         $this->setFilters($request);
         $this->data['carreras'] = $this->carreraRepo->index($request);
-        return view('Admin.Carreras.index',$this->data);
+        return view('Admin.Carreras.index', $this->data);
     }
 
     /**
@@ -57,51 +57,92 @@ class CarrerasCrudController extends BaseController
         return redirect()->route('admin.carreras.index');
     }
 
-
+    public function show(Carrera $carrera)
+    {
+        $carrera->load('asignaturas');
+        return view('Admin.Carreras.show', ['carrera' => $carrera]);
+    }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Request $request,Carrera $carrera)
+    public function edit(Request $request, Carrera $carrera)
     {
-        return view('Admin.Carreras.edit', ['carrera'=> Carrera::where('id',$carrera->id)->with('asignaturas')->first()]);
-        
+        $carrera->load('asignaturas');
+        return view('Admin.Carreras.edit', ['carrera' => $carrera]);
     }
+
 
     /**
      * Update the specified resource in storage.
      */
     public function update(EditarCarreraRequest $request, Carrera $carrera)
+
     {
         $datos = $request->validated();
 
-        if($request->has('resolucion_archivo')){
-            $request->file('resolucion_archivo')->storeAs(str_replace(' ','_',$datos['nombre']).'.pdf');
-            $datos['resolucion_archivo'] = str_replace(' ','_',$datos['nombre']).'.pdf';
+        if ($request->has('resolucion_archivo')) {
+            $request->file('resolucion_archivo')->storeAs(str_replace(' ', '_', $datos['nombre']) . '.pdf');
+            $datos['resolucion_archivo'] = str_replace(' ', '_', $datos['nombre']) . '.pdf';
         }
 
 
         $carrera->update($datos);
 
-        if(!$request->has('vigente')){
-            $carrera->vigente=true;
+        if (!$request->has('vigente')) {
+            $carrera->vigente = true;
             $carrera->save();
         }
-        if($request->has('redirect'))
-            return redirect()->to($request->input('redirect'))->with('mensaje','Se edito la carrera');
+        if ($request->has('redirect'))
+            return redirect()->to($request->input('redirect'))->with('mensaje', 'Se edito la carrera');
         else
-            return redirect()->back()->with('mensaje','Se edito la carrera');
-    
-
-        // return redirect()->back()->with('mensaje','Se edito la carrera');
+            return redirect()->back()->with('mensaje', 'Se edito la carrera');
     }
 
+    public function addAsignaturaView(Request $request)
+    {
+        log::debug($request->all());
+        $carrera = Carrera::find($request->carrera);
+        $asignaturas = Asignatura::orderBy('nombre')->get();
+        $id_asignatura = $request->id_asignatura ?? null;
+        return view('Admin.Carreras.add', [
+            'carrera' => $carrera,
+            'asignaturas' => $asignaturas,
+            'id_asignatura' => $id_asignatura,
+        ]);
+    }
+    public function addAsignatura(Request $request, Carrera $carrera)
+    {
+        try {
+            $data = [
+                'id_carrera' => $request->carrera_id,
+                'id_asignatura' => $request->asignatura_id,
+                'anio' => $request->anio,
+                'tipo_modulo' => $request->tipo_modulo,
+                'carga_horaria' => $request->carga_horaria,
+            ];
+            log::debug($data);
+            $carrera->asignaturas()->attach(["asignatura" => $data]);
+        } catch (\Exception $e) {
+            Log::error($e);
+            return redirect()->back()->with('error', 'No se pudo agregar la asignatura');
+        }
+
+        return redirect()->back()->with('mensaje', 'Se agrego la asignatura');
+    }
+
+    //FIXME: Falta desarrollar la funcionalidad de eliminar una carrera
     /**
      * Remove the specified resource from storage.
      */
     public function destroy(Carrera $carrera)
     {
-        return redirect() -> route('admin.carreras.index') -> with('error', 'Las carreras no se pueden eliminar');
+        return redirect()->route('admin.carreras.index')->with('error', 'Las carreras no se pueden eliminar');
     }
 
+    public function deleteAsignatura(Request $request, Carrera $carrera, Asignatura $asignatura)
+    {
+        $carrera->asignaturas()->detach($asignatura);
+        return redirect()->back()->with('mensaje', 'Se elimino la asignatura');
+    }
 }

@@ -4,13 +4,13 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class crearAlumnoRequest extends FormRequest
+class CrearAlumnoRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
-    {   
+    {
         return true;
     }
 
@@ -23,23 +23,26 @@ class crearAlumnoRequest extends FormRequest
     {
         return [
             'dni' => ['required','numeric','max:999999999'],
-            'nombre' => ['required','regex:/[a-zA-Z0-9\s]+/'],
-            'apellido' => ['required','regex:/[a-zA-Z0-9\s]+/'],
+            'nombre' => ['required', 'regex:/^[a-zA-Z]+$/'],
+            'apellido' => ['required', 'regex:/^[a-zA-Z]+$/'],
             'fecha_nacimiento' => ['required','date','before:now'],
-            'ciudad' => ['nullable'],
-            'calle' => ['nullable'],
+            'ciudad' => ['nullable', 'regex:/^[\pL\pN\s]+$/u'],
+           'calle' => ['nullable', 'regex:/^[\pL]+$/u'],
             'casa_numero' => ['nullable','numeric'],
             'dpto' => ['nullable'],
             'piso' => ['nullable'],
             'estado_civil' => ['required'],
             'email' => ['nullable','unique:alumnos'],
-            'titulo_anterior' => ['nullable'],
+            'nombre_institucion_secundario' => ['required','string','max:255','regex:/^[A-Za-záéíóúÁÉÍÓÚÑñ\s\d]+$/'],
+            'titulo_anterior' => ['nullable', 'regex:/^[\pL\s]+$/u'],
             'becas' => ['numeric','nullable'],
             'observaciones' => ['nullable'],
             'telefono1' => ['nullable','numeric'],
             'telefono2' => ['nullable','numeric'],
             'telefono3' => ['nullable','numeric'],
-            'codigo_postal' => ['nullable','alpha_num']
+            'codigo_postal' => ['nullable','alpha_num'],
+            'estado' => ['nullable'],
+            'titulo_secundario' => ['required']
         ];
     }
     public function messages()
