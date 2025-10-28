@@ -17,6 +17,7 @@ use App\Services\Admin\MesasCheckerService;
 use App\Services\DiasHabiles;
 use DateInterval;
 use DateTime;
+use App\Models\Alumno;
 use Illuminate\Http\Request;
 
 class MesasCrudController extends BaseController
@@ -39,6 +40,7 @@ class MesasCrudController extends BaseController
     function __construct(MesaRepository $mesaRepo, MesasCheckerService $mesasService)
     {
         parent::__construct();
+        $this->middleware('auth:admin');
         $this->mesaRepo = $mesaRepo;
         $this->mesasService = $mesasService;
     }
@@ -47,7 +49,7 @@ class MesasCrudController extends BaseController
      * Display a listing of the resource.
      */
     public function index(Request $request)
-    {       
+    {
         $this->setFilters($request);
         $this->data['mesas'] = $this->mesaRepo->index($request);
 
@@ -61,20 +63,20 @@ class MesasCrudController extends BaseController
     {
 
         $precargados = [];
-        if($request->has('asignatura') && $request->has('carrera')){
+        if ($request->has('asignatura') && $request->has('carrera')) {
             $precargados['carrera'] = $request->input('carrera');
             $precargados['asignatura'] = Asignatura::find($request->input('asignatura'));
-        }else{
+        } else {
             $precargados['carrera'] = null;
             $precargados['asignatura'] = null;
         }
 
         $carreras = Carrera::where('vigente', 1)->get();
-        $profesores = Profesor::orderBy('apellido','asc')->orderBy('apellido','asc')->get();
-        
-        return view('Admin.Mesas.create',[
-            'carreras'=>$carreras,
-            'profesores'=>$profesores,
+        $profesores = Profesor::orderBy('apellido', 'asc')->orderBy('apellido', 'asc')->get();
+
+        return view('Admin.Mesas.create', [
+            'carreras' => $carreras,
+            'profesores' => $profesores,
             'precargados' => $precargados,
             'ProfesoresModel' => Profesor::class
         ]);
@@ -85,39 +87,70 @@ class MesasCrudController extends BaseController
      */
     public function store(CrearMesaRequest $request)
     {
-        // configuracion
-        $config=Configuracion::todas();
 
         // obtener datos validados
         $data = $request->validated();
 
-        $esDiaValido = $this->mesasService->esDiaHabil($data['fecha']);
+        $esDiaValido = $this->mesasService->esDiaHabil($data['fecha_1']);
 
-        if(!$esDiaValido['success']){
+        if (!$esDiaValido['success']) {
             return redirect()->back()->with('error', $esDiaValido['mensaje'])->withInput();
-        } 
+        }
 
-        // se añade el id de la carrera al registro de mesa, ya que no viene en el formulario
-        // no deberia ser necesario pero la base de datos anterior hacia uso de esta duplicidad
-        $data['id_carrera'] = Asignatura::find($data['id_asignatura'])->carrera->id;
-        
-        $llamadoYaExiste = $this->mesasService->llamadoYaExiste($data);
-        
-        if($llamadoYaExiste['success']){
-            return redirect()->back()->with('error',$llamadoYaExiste['mensaje'])->withInput();
+        $llamadoYaExiste = $this->mesasService->llamadoYaExiste([
+            'id_asignatura' => $data['id_asignatura'],
+            'fecha' => $data['fecha_1'],
+            'llamado' => 1
+        ]);
+
+        if ($llamadoYaExiste['success']) {
+            return redirect()->back()->with('error', $llamadoYaExiste['mensaje'])->withInput();
         }
 
         // Que los profes no sean los mismos
-        if(
+        if (
             $data['prof_presidente'] == $data['prof_vocal_1'] ||
             $data['prof_presidente'] == $data['prof_vocal_2'] ||
             $data['prof_vocal_1'] == $data['prof_vocal_2'] && $data['prof_vocal_1'] != '0'
-        ){
-            return redirect()->back()->with('error','Hay profesores repetidos');
+        ) {
+            return redirect()->back()->with('error', 'Hay profesores repetidos');
         }
-    
-        Mesa::create($data);
-        return \redirect()->back()->with('mensaje','Se creo la mesa');
+        if ($data['cantidad_llamados'] == 2) {
+
+            $esDiaValido = $this->mesasService->esDiaHabil($data['fecha_2']);
+            if (!$esDiaValido['success']) {
+                return redirect()->back()->with('error', $esDiaValido['mensaje'])->withInput();
+            }
+            $llamadoYaExiste = $this->mesasService->llamadoYaExiste([
+                'id_asignatura' => $data['id_asignatura'],
+                'fecha' => $data['fecha_2'],
+                'llamado' => 2
+            ]);
+
+            if ($llamadoYaExiste['success']) {
+                return redirect()->back()->with('error', $llamadoYaExiste['mensaje'])->withInput();
+            }
+            Mesa::create([
+                'id_carrera' => $data['carrera'],
+                'id_asignatura' => $data['id_asignatura'],
+                'fecha' => $data['fecha_2'],
+                'llamado' => 2,
+                'prof_presidente' => $data['prof_vocal_1'],
+                'prof_vocal_1' => $data['prof_vocal_2'],
+                'prof_vocal_2' => $data['prof_presidente']
+            ]);
+        }
+
+        Mesa::create([
+            'id_carrera' => $data['carrera'],
+            'id_asignatura' => $data['id_asignatura'],
+            'fecha' => $data['fecha_1'],
+            'llamado' => 1,
+            'prof_presidente' => $data['prof_presidente'],
+            'prof_vocal_1' => $data['prof_vocal_1'],
+            'prof_vocal_2' => $data['prof_vocal_2']
+        ]);
+        return \redirect()->back()->with('mensaje', 'Se creo la mesa');
     }
 
 
@@ -126,14 +159,20 @@ class MesasCrudController extends BaseController
      */
     public function edit(Request $request, $mesa)
     {
-        $mesa = Mesa::where('id', $mesa)->with('asignatura.carrera','profesor','vocal1','vocal2','examenes.alumno')->first();
-        
+        $mesa = Mesa::where('id', $mesa)->with('asignatura.carrera', 'profesor', 'vocal1', 'vocal2', 'examenes.alumno')->first();
+
         $inscribibles = $this->mesaRepo->inscribibles($mesa);
+
+        $inscribibles = Alumno::whereHas('cursadas', function ($q) use ($mesa) {
+            $q->where('id_asignatura', $mesa->id_asignatura);
+            $q->where('id_carrera', $mesa->asignatura->carrera->first()->id);
+            $q->where('aprobada', 1); // 1 = aprobada
+        })->get();
 
 
         return view('Admin.Mesas.edit', [
             'mesa' => $mesa,
-            'profesores'=> Profesor::orderBy('apellido')->orderBy('nombre')->get(),
+            'profesores' => Profesor::orderBy('apellido')->orderBy('nombre')->get(),
             'inscribibles' => $inscribibles
         ]);
     }
@@ -145,27 +184,27 @@ class MesasCrudController extends BaseController
     {
         //CAMIAR REQUEST ALL
         $data = $request->validated();
-        
+
         // verificar que no sea sabado ni domingo
-        if(DiasHabiles::esFinDeSemana($data['fecha'])){
-            return \redirect()->back()->with('error','La fecha es fin de semana');
+        if (DiasHabiles::esFinDeSemana($data['fecha'])) {
+            return \redirect()->back()->with('error', 'La fecha es fin de semana');
         }
 
         // verificar que no sea feriado, o similar
-        if(!DiasHabiles::esDiaHabil($data['fecha'])){
-            return \redirect()->back()->with('error','La fecha es un dia no habil');
+        if (!DiasHabiles::esDiaHabil($data['fecha'])) {
+            return \redirect()->back()->with('error', 'La fecha es un dia no habil');
         }
 
-        if(
+        if (
             $data['prof_presidente'] == $data['prof_vocal_1'] ||
             $data['prof_presidente'] == $data['prof_vocal_2'] ||
             $data['prof_vocal_1'] == $data['prof_vocal_2'] && $data['prof_vocal_1'] != '0'
-        ){
-            return redirect()->back()->with('error','Hay profesores repetidos');
+        ) {
+            return redirect()->back()->with('error', 'Hay profesores repetidos');
         }
 
         $mesa->update($data);
-        return redirect()->back()->with('mensaje','Se edito la mesa');
+        return redirect()->back()->with('mensaje', 'Se edito la mesa');
     }
 
     /**
@@ -173,7 +212,27 @@ class MesasCrudController extends BaseController
      */
     public function destroy(Mesa $mesa)
     {
-        $this->mesaRepo->delete($mesa);
-        return redirect() -> route('admin.mesas.index') -> with('mensaje', 'Se ha eliminado la mesa');
+        try {
+
+            //verificar que no tenga fecha hoy o futura
+            if ($mesa->fecha >= date('Y-m-d')) {
+                return redirect()->route('admin.mesas.index')
+                    ->with('error', 'No se pudo eliminar la mesa. Tiene fecha hoy o futura.');
+            }
+
+            //Verificar que no tenga alumnos inscriptos
+            if ($mesa->examenes()->exists()) {
+                return redirect()->route('admin.mesas.index')
+                    ->with('error', 'No se pudo eliminar la mesa. Tiene alumnos inscriptos.');
+            }
+
+            //eliminar mesa
+            $mesa->delete();
+            return redirect()->route('admin.mesas.index')
+                ->with('mensaje', 'Se ha eliminado la mesa');
+        } catch (\Exception $e) {
+            return redirect()->route('admin.mesas.index')
+                ->with('error', 'No se pudo eliminar la mesa. Error: ' . $e->getMessage());
+        }
     }
 }

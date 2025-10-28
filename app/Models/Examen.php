@@ -8,49 +8,75 @@ use Illuminate\Database\Eloquent\Model;
 class Examen extends Model
 {
     protected $table = "examenes";
-    protected $fillable = ['id_mesa','id_asignatura','id_alumno','nota','fecha','aprobado'];
+    protected $fillable = [
+        'id_mesa',
+        'id_asignatura',
+        'id_carrera',
+        'id_alumno',
+        'libro',
+        'acta',
+        'nota',
+        'fecha',
+        'aprobado',
+        'tipo_final'
+    ];
     public $timestamps = false;
     use HasFactory;
 
-    function mesa(){
-        return $this -> belongsTo(Mesa::class,'id_mesa');
+    public function mesa()
+    {
+        return $this->belongsTo(Mesa::class, 'id_mesa');
     }
 
-    function alumno(){
-        return $this -> belongsTo(Alumno::class,'id_alumno');
+    public function carrera()
+    {
+        return $this->belongsTo(Carrera::class, 'id_carrera');
     }
 
-    function asignatura(){
-        return $this -> belongsTo(Asignatura::class,'id_asignatura');
+    public function alumno()
+    {
+        return $this->belongsTo(Alumno::class, 'id_alumno');
     }
 
-    function fecha(){
-        if( $this-> fecha ){
-           return $this->fecha;
+    public function asignatura()
+    {
+        return $this->belongsTo(Asignatura::class, 'id_asignatura');
+    }
+
+    public function fecha()
+    {
+        if ($this->fecha) {
+            return $this->fecha;
         }
-     
+
         $mesa = Mesa::where('id', $this->id_mesa)
-           -> first();
-     
-        if( !$mesa ) return null;
-        
+            ->first();
+
+        if (!$mesa)
+            return null;
+
         return $mesa->fecha;
-     }
-
- 
-
-    public function tipoFinal(){
-        if($this->tipo_final == 1) return "Escrito";
-        else if($this->tipo_final == 2) return "Oral";
-        else if($this->tipo_final == 3) return "Promocionado";
-        else return "Sin especificar";
     }
 
-    public function nota(){
-        if($this->aprobado == 3) return 'Ausente';
-        else if($this->nota <= 0) return 'Aun no rendido';
-        else return $this->nota;
+    public function tipoFinal()
+    {
+        return match ($this->tipo_final) {
+            1 => "Escrito",
+            2 => "Oral",
+            3 => "Promocionado",
+            4 => "Equivalencia",
+            default => "Sin especificar"
+        };
     }
 
+    public function nota()
+    {
+        if ($this->aprobado == 3)
+            return 'Ausente';
+        else if ($this->nota <= 0)
+            return 'Aun no rendido';
+        else
+            return $this->nota;
+    }
 
 }

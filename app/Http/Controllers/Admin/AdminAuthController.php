@@ -2,54 +2,96 @@
 
 namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
-
-use App\Http\Requests\AdminLoginRequest;
+use Illuminate\Http\Request;
 use App\Models\Admin;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\View\View;
+use App\Http\Requests\AdminLoginRequest;
+use Illuminate\Support\Facades\Log;
 
 class AdminAuthController extends Controller
 {
 
     /*
      | ---------------------------------------------
-     | Middleware de administrador, excepto el login 
+     | Middleware de administrador, excepto el login
      | ---------------------------------------------
     */
-
     public function __construct()
     {
         $this->middleware('guest:admin')->except('logout');
         $this->middleware('auth:admin')->only('logout');
     }
 
-    /*
-     | ------------------------------------------
-     | valida las credenciales del administrador
-     | ------------------------------------------
+    /**
+     * Vista Logueo de administrador
+     * @return \Illuminate\View\View
      */
-
-     function loginView(){
-        return view('Admin.Auth.login');
+    public function loginView(): View
+    {
+        return view(view: 'Admin.Auth.login');
     }
 
-    function login(AdminLoginRequest $request){
-        $validateData = $request->validated();
+    /**
+     * Valida las credenciales del administrador y loguea al mismo
+     *
+     * @param AdminLoginRequest $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function login(Request $request)
+    {
+        $request->validate([
+            'username' => 'required',
+            'password' => 'required',
+            'rol' => 'required',
+        ]);
 
-        $usernameGiven = $validateData['username'];
-        $passwordGiven = $validateData['password'];
+        $admin = Admin::where('username', $request->username)->first();
 
-        $admin = Admin::where('username', $usernameGiven)->first();
-
-        if(!$admin || !Hash::check($passwordGiven, $admin->password)) {
-            return redirect()->route('admin.login')->with('error','Credenciales incorrectas');
+        if (!$admin) {
+            return back()->withErrors(['username' => 'El usuario no existe.']);
         }
 
+        // Validar rol seleccionado
+        $roles = [
+            'regente' => 0,
+            'preceptor' => 1,
+            'secretario' => 2,
+        ];
+
+        $rolSeleccionado = $roles[$request->rol] ?? null;
+
+        if ($admin->rol !== $rolSeleccionado) {
+            return back()->withErrors(['rol' => 'Rol incorrecto para este usuario.']);
+        }
+
+        // Validar contraseña
+        if (!\Hash::check($request->password, $admin->password)) {
+            return back()->withErrors(['password' => 'Contraseña incorrecta.']);
+        }
+
+        // Iniciar sesión con el guard 'admin'
         Auth::guard('admin')->login($admin);
-        return redirect()->route('admin.alumnos.index');
+
+        return match ($request->rol) {
+            'preceptor' => redirect()->route('preceptor.alumnos.index'),
+            'regente' => redirect()->route('admin.alumnos.index'),
+            'secretario' => redirect()->route('secretario.alumnos.index'),
+            default => redirect()->route('admin.alumnos.index'),
+        };
     }
 
-    function logout(){
+
+
+    /**
+     * cierra sesion del administrador
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function logout(): RedirectResponse
+    {
         Auth::logout();
         return redirect()->route('admin.login');
     }

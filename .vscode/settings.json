@@ -1,0 +1,52 @@
+{
+  "editor.formatOnSave": true,
+  "editor.tabSize": 1,
+  "[blade]": {
+    "editor.defaultFormatter": "shufo.vscode-blade-formatter"
+  },
+  "todo-tree.general.tags": [
+    "FIXME",
+    "WARN",
+    "COMPLETE",
+    "INFO",
+    "TODO"
+  ],
+  "todo-tree.highlights.defaultHighlight": {
+    "icon": "alert",
+    "type": "text",
+    "foreground": "red",
+    "opacity": 50,
+    "iconColour": "yellow"
+  },
+  "todo-tree.highlights.customHighlight": {
+    "TODO": {
+      "icon": "check",
+      "type": "line"
+    },
+    "WARN": {
+      "icon": "alert",
+      "type": "line"
+    },
+    "COMPLETE": {
+      "icon": "check",
+      "type": "line"
+    },
+    "INFO": {
+      "icon": "info",
+      "type": "line"
+    },
+    "FIXME": {
+      "iconColour": "yellow",
+      "gutterIcon": true
+    }
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": false
+  },
+  "explorerExclude.backup": {},
+  "php.version": "8.4"
+}

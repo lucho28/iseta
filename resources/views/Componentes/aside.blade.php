@@ -1,32 +1,76 @@
-<aside class="none lg-block admin-aside">
-    <h1 class="logo-iseta">ISETA Admin</h1>  
-    <ul>
-        <li><a class="text-blue-600" href="{{route('admin.alumnos.index')}} "><i class="ti ti-user"></i>Alumnos</a></li>
-        <li><a class="text-blue-600" href="{{route('admin.profesores.index')}}"><i class="ti ti-users"></i>    Profesores  </a></li>
-        <li><a class="text-blue-600" href="{{route('admin.carreras.index')}}"><i class="ti ti-address-book"></i>      Carreras    </a></li>
-        {{-- <li><a class="text-blue-600" href="{{route('admin.asignaturas.index')}}">   Asignaturas </a></li> --}}
-        <li><a class="text-blue-600" href="{{route('admin.mesas.index')}}"><i class="ti ti-clipboard-text"></i>         Mesas       </a></li>
-        {{-- <li><a class="text-blue-600" href="{{route('admin.examenes.index')}}"><i class="ti ti-address-book"></i>      Examenes    </a></li> --}}
-        <li><a class="text-blue-600" href="{{route('admin.cursadas.index')}}"><i class="ti ti-books"></i></i>      Cursadas    </a></li>
-        <li><a class="text-blue-600" href="{{route('admin.inscriptos.index')}}"><i class="ti ti-file-invoice"></i>      Inscriptos    </a></li>
-        <hr>
-        <li><a class="text-blue-600" href="{{route('admin.admins.index')}}  "><i class="ti ti-user-cog"></i>      Admins      </a></li>
-        <li><a class="text-blue-600" href="{{route('admin.config.index')}}  "><i class="ti ti-settings"></i>      Configuracion      </a></li>
-        <li><a class="text-blue-600" href="{{route('admin.habiles.index')}}  "><i class="ti ti-calendar-time"></i>      Dias no habiles      </a></li>
+<aside id="sidebar" class="sidebar" aria-label="Barra lateral de navegación">
+    <div class="sidebar__header">
+        {{-- Logos --}}
+        <img src="{{ asset('img/logo-mini.png') }}" alt="Logo Mini" class="sidebar__logo--mini">
+        <img src="{{ asset('img/logo.png') }}" alt="Logo Completo" class="sidebar__logo--full">
+    </div>
 
-        <div class="aside-end">
-            <li> 
-                <a class="text-blue-600" href="{{route('admin.config.modoseguro')}}"><i class="ti ti-shield-lock"></i>
-                    @if ($config['modo_seguro'])
-                        Desactivar modo seguro
-                    @else
-                        Activar modo seguro
-                    @endif
+    <nav class="sidebar__nav" role="navigation">
+        <ul class="sidebar__list">
+            <li class="sidebar__item {{ request()->routeIs('admin.alumnos.*') ? 'is-active' : '' }}">
+                <a class="sidebar__link" href="{{ route('admin.alumnos.index') }}">
+                    <i class="ti ti-user sidebar__icon"></i>
+                    <span class="sidebar__text">Alumnos</span>
                 </a>
             </li>
-            <li><a href="/admin/logout"><i class="ti ti-logout"></i> Cerrar sesion</a></li>
-        </div>
-    </ul>
-    
-    
+
+            <li class="sidebar__item {{ request()->routeIs('admin.profesores.*') ? 'is-active' : '' }}">
+                <a class="sidebar__link" href="{{ route('admin.profesores.index') }}">
+                    <i class="ti ti-users sidebar__icon"></i>
+                    <span class="sidebar__text">Profesores</span>
+                </a>
+            </li>
+
+            <li class="sidebar__item {{ request()->routeIs('admin.carreras.*') ? 'is-active' : '' }}">
+                <a class="sidebar__link" href="{{ route('admin.carreras.index') }}">
+                    <i class="ti ti-folders sidebar__icon"></i>
+                    <span class="sidebar__text">Carreras</span>
+                </a>
+            </li>
+
+            <li class="sidebar__item {{ request()->routeIs('admin.asignaturas.*') ? 'is-active' : '' }}">
+                <a class="sidebar__link" href="{{ route('admin.asignaturas.index') }}">
+                    <i class="ti ti-notes sidebar__icon"></i>
+                    <span class="sidebar__text">Asignaturas</span>
+                </a>
+            </li>
+
+            <li class="sidebar__item {{ request()->routeIs('admin.mesas.*') ? 'is-active' : '' }}">
+                <a class="sidebar__link" href="{{ route('admin.mesas.index') }}">
+                    <i class="ti ti-address-book sidebar__icon"></i>
+                    <span class="sidebar__text">Mesas</span>
+                </a>
+            </li>
+
+            <li class="sidebar__item {{ request()->routeIs('admin.cursadas.*') ? 'is-active' : '' }}">
+                <a class="sidebar__link" href="{{ route('admin.cursadas.index') }}">
+                    <i class="ti ti-books sidebar__icon"></i>
+                    <span class="sidebar__text">Cursadas</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
 </aside>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebar = document.getElementById('sidebar');
+
+        // Expande y colapsa con hover estable
+        sidebar.addEventListener('mouseenter', () => {
+            sidebar.classList.add('is-expanded');
+        });
+
+        sidebar.addEventListener('mouseleave', () => {
+            sidebar.classList.remove('is-expanded');
+        });
+
+        // Evita el parpadeo al hacer clic en los enlaces
+        const links = sidebar.querySelectorAll('.sidebar__link');
+        links.forEach(link => {
+            link.addEventListener('mousedown', () => {
+                sidebar.classList.add('is-expanded');
+            });
+        });
+    });
+</script>

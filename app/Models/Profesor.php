@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Services\TextFormatService;
 use App\Traits\ModelTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class Profesor extends Authenticatable
@@ -21,63 +23,104 @@ class Profesor extends Authenticatable
         'fecha_nacimiento',
         'ciudad',
         'calle',
-        'casa_numero' ,
-        'dpto' ,
-        'piso' ,
-        'estado_civil' ,
+        'casa_numero',
+        'dpto',
+        'piso',
+        'estado_civil',
         'email',
-        'formacion_academica' ,
+        'formacion_academica',
         'titulo',
+        'anio_ingreso',
         'observaciones',
         'telefono1',
-        'telefono2' ,
+        'telefono2',
         'telefono3',
         'codigo_postal',
-        'password'
+        'password',
+        'lugar_nacimiento',
+
     ];
 
     protected $casts = [
         'fecha_nacimiento' => 'datetime',
     ];
 
-    function firstItemsForSelect(){
-        return ['0'=>'Vacio/A confirmar'];
+public function asignaturas(): BelongsToMany
+{
+    return $this->belongsToMany(
+        Asignatura::class,
+        'carrera_asignatura_profesor',
+        'id_profesor',
+        'id_asignatura'
+    )
+    ->using(CarreraAsignaturaProfesor::class)
+    ->withPivot('id_carrera', 'anio', 'tipo_modulo', 'carga_horaria')
+    ->withTimestamps();
+}
+
+
+    public function profesor_mesa(): HasMany
+    {
+        return $this->hasMany(Mesa::class, 'prof_presidente', 'id');
     }
 
-    function others(){
-        return Profesor::where('id',3)->get();
+    public function profesor_mesa_vocal(): HasMany
+    {
+        return $this->hasMany(Mesa::class, 'prof_vocal_1', 'id');
     }
 
-    function elementsForDropdown($filter){
-        if($filter=='order'){
+    public function profesor_mesa_vocal2(): HasMany
+    {
+        return $this->hasMany(Mesa::class, 'prof_vocal_2', 'id');
+    }
+
+    public function firstItemsForSelect()
+    {
+        return ['0' => 'Vacio/A confirmar'];
+    }
+
+    function others()
+    {
+        return Profesor::where('id', 3)->get();
+    }
+
+    function elementsForDropdown($filter)
+    {
+        if ($filter == 'order') {
             return Profesor::select()->orderBy('apellido')->orderBy('nombre')->get();
         }
     }
 
-    function textForSelect(){
+    function textForSelect()
+    {
         return $this->apellidoNombre();
     }
-    
-    static function existeSinPassword($data){
+
+    static function existeSinPassword($data)
+    {
         return Profesor::where('email', $data['email'])
-            -> where('password','0')
-            -> where('dni',$data['dni'])
-            -> first();
+            ->where('password', '0')
+            ->where('dni', $data['dni'])
+            ->first();
     }
-    public function verificar(){
+    public function verificar()
+    {
         $this->verificado = 1;
         $this->save();
     }
 
-    public function nombreApellido(){
-        return $this->nombre.' '.$this->apellido;
-    }
-    
-    public function apellidoNombre(){
-        return $this->apellido.' '.$this->nombre;
+    public function nombreApellido()
+    {
+        return $this->nombre . ' ' . $this->apellido;
     }
 
-    public function dniPuntos(){
+    public function apellidoNombre()
+    {
+        return $this->apellido . ' ' . $this->nombre;
+    }
+
+    public function dniPuntos()
+    {
         return number_format($this->dni, 0, ',', '.');
     }
 

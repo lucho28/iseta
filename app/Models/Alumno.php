@@ -8,14 +8,14 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\HasApiTokens;
 
 class Alumno extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable, ModelTrait;
+    use HasApiTokens, HasFactory, ModelTrait, Notifiable;
 
     protected $table = 'alumnos';
+
     public $timestamps = false;
 
     /**
@@ -30,19 +30,24 @@ class Alumno extends Authenticatable implements MustVerifyEmail
         'fecha_nacimiento',
         'ciudad',
         'calle',
-        'casa_numero' ,
-        'dpto' ,
-        'piso' ,
-        'estado_civil' ,
+        'casa_numero',
+        'dpto',
+        'piso',
+        'estado_civil',
         'email',
-        'titulo_anterior' ,
+        'nombre_institucion_secundario',
+        'titulo_anterior',
         'becas',
         'observaciones',
         'telefono1',
-        'telefono2' ,
+        'telefono2',
         'telefono3',
         'codigo_postal',
-        'password'
+        'password',
+        'titulo_secundario',
+        'genero',
+        'lugar_nacimiento',
+        'estado',
     ];
 
     /**
@@ -51,6 +56,7 @@ class Alumno extends Authenticatable implements MustVerifyEmail
      * @var array<int, string>
      */
     protected $hidden = [
+
         'password',
         'remember_token',
     ];
@@ -65,82 +71,110 @@ class Alumno extends Authenticatable implements MustVerifyEmail
         'fecha_nacimiento' => 'datetime',
     ];
 
-    static function existeSinPassword($data){
-        return Alumno::where('email', $data['email'])
-            -> where('password','0')
-            -> where('dni',$data['dni'])
-            -> first();
+       public function egresadoinscripto()
+    {
+        return $this->hasMany(\App\Models\Egresado::class, 'id_alumno', 'id');
     }
 
-    public function verificar(){
+
+    public function carreraDefault()
+    {
+        return $this->hasOne(CarreraDefault::class, 'id_alumno', 'id');
+    }
+
+    public static function existeSinPassword($data)
+    {
+        return Alumno::where('email', $data['email'])
+            ->where('password', '0')
+            ->where('dni', $data['dni'])
+            ->first();
+    }
+
+    public function verificar()
+    {
         $this->verificado = 1;
         $this->save();
     }
 
-    public function estadoCivilStr(){
+    public function estadoCivilStr()
+    {
 
-        $estados_civiles = ['soltero/a','casado/a','divorciado/a','viudo/a','conyuge','otro'];
+        $estados_civiles = ['soltero/a', 'casado/a', 'divorciado/a', 'viudo/a', 'conyuge', 'otro'];
 
-        if(isset($estados_civiles[$this->estado_civil])){
+        if (isset($estados_civiles[$this->estado_civil])) {
             return $estados_civiles[$this->estado_civil];
-        }else{
+        } else {
             return 'Otro';
         }
-        
     }
 
-    public function cursadas(){
-        return $this -> hasMany(Cursada::class,'id_alumno');
+    public function cursadas()
+    {
+        return $this->hasMany(Cursada::class, 'id_alumno');
     }
 
-    public function carreras(){
-        return Egresado::with('carrera')->where('id_alumno',$this->id)->get();
-    }
+    public function carreras()
+{
+    return $this->belongsToMany(
+        Carrera::class,
+        'egresadoinscripto',    // nombre exacto de la tabla pivot
+        'id_alumno',             // FK en la pivot hacia alumno
+        'id_carrera'             // FK en la pivot hacia carrera
+    );
+}
 
-    public function carrerasIncriptas(){
+    public function carrerasIncriptas()
+    {
         $alumno = $this->id;
 
-        return Carrera::select('carreras.id as carrera_id','carreras.nombre as carrera_nombre')
-            ->leftJoin('egresadoinscripto', 'egresadoinscripto.id_carrera','carreras.id')
-            ->where('egresadoinscripto.id_alumno',$alumno)
+        return Carrera::select('carreras.id as carrera_id', 'carreras.nombre as carrera_nombre')
+            ->leftJoin('egresadoinscripto', 'egresadoinscripto.id_carrera', 'carreras.id')
+            ->where('egresadoinscripto.id_alumno', $alumno)
             ->get();
-        
     }
 
-    public function examenes(){
-        return $this -> hasMany(Examen::class, 'id_alumno');
+    public function examenes()
+    {
+        return $this->hasMany(Examen::class, 'id_alumno');
     }
 
-    function textForSelect(){
+    public function textForSelect()
+    {
         return $this->apellidoNombre();
     }
 
-    function elementsForDropdown($filter){
-        if($filter=='orderByApellidoNombre'){
+    public function elementsForDropdown($filter)
+    {
+        if ($filter == 'orderByApellidoNombre') {
             return Alumno::select()->orderBy('apellido')->orderBy('nombre')->get();
         }
     }
 
-    public function nombreApellido(){
+    public function nombreApellido()
+    {
         return $this->nombre.' '.$this->apellido;
     }
-    
-    public function apellidoNombre(){
+
+    public function apellidoNombre()
+    {
         return $this->apellido.' '.$this->nombre;
     }
 
-    public function dniPuntos(){
+    public function dniPuntos()
+    {
         return number_format($this->dni, 0, ',', '.');
     }
 
-    public function primerNombre(){
-        return explode(' ',$this->nombre)[0];
+    public function primerNombre()
+    {
+        return explode(' ', $this->nombre)[0];
     }
 
-    public function iniciales(){
+    public function iniciales()
+    {
         return "{$this->nombre[0]}.{$this->apellido[0]}.";
     }
-    
+
     public function setEmailAttribute($value)
     {
         $this->attributes['email'] = strtolower($value);
@@ -171,14 +205,49 @@ class Alumno extends Authenticatable implements MustVerifyEmail
         $this->attributes['calle'] = TextFormatService::ucfirst($value);
     }
 
-    function ciudades(){
+    public function ciudades()
+    {
         $result = Alumno::select('ciudad')->distinct('ciudad')->get()->pluck('ciudad');
         $ciudades = ['Cualquiera'];
-        foreach($result as $ciudad){
-            if(!in_array(trim($ciudad),$ciudades)){
+        foreach ($result as $ciudad) {
+            if (! in_array(trim($ciudad), $ciudades)) {
                 $ciudades[trim($ciudad)] = trim($ciudad);
             }
         }
+
         return $ciudades;
+    }
+
+    public function getTituloSecundarioTexto()
+    {
+        $titulo = [
+            'No entregado',
+            'Fotocopia del título original secundario',
+            'Certificado de constancia de título en trámite',
+            'Constancia de alumno del último año del nivel secundario',
+        ];
+
+        return $titulo[$this->titulo];
+    }
+
+    public function genero()
+    {
+        $generos = ['Masculino', 'Femenino', 'Otro'];
+
+        if (isset($generos[$this->genero])) {
+            return $generos[$this->genero];
+        } else {
+            return 'Otro';
+        }
+    }
+
+    public function generoString(): string
+    {
+        return match ((int) $this->genero) {
+            1 => 'Masculino',
+            2 => 'Femenino',
+            3 => 'Otro',
+            default => 'Desconocido',
+        };
     }
 }

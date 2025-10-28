@@ -2,15 +2,16 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\Telefono;
 use Illuminate\Foundation\Http\FormRequest;
 
-class crearAlumnoRequest extends FormRequest
+class CrearAlumnoRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
-    {   
+    {
         return true;
     }
 
@@ -22,26 +23,31 @@ class crearAlumnoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'dni' => ['required','numeric','max:999999999'],
-            'nombre' => ['required','regex:/[a-zA-Z0-9\s]+/'],
-            'apellido' => ['required','regex:/[a-zA-Z0-9\s]+/'],
-            'fecha_nacimiento' => ['required','date','before:now'],
-            'ciudad' => ['nullable'],
-            'calle' => ['nullable'],
-            'casa_numero' => ['nullable','numeric'],
-            'dpto' => ['nullable'],
-            'piso' => ['nullable'],
-            'estado_civil' => ['required'],
-            'email' => ['nullable','unique:alumnos'],
-            'titulo_anterior' => ['nullable'],
-            'becas' => ['numeric','nullable'],
+            'dni' => ['required', 'numeric', 'max_digits:9', 'unique:alumnos,dni'],
+            'nombre' => ['required', 'string', 'max:30'],
+            'apellido' => ['required', 'string', 'max:30'],
+            'fecha_nacimiento' => ['required', 'date', 'before:now'],
+            'ciudad' => ['nullable', 'string', 'max:30'],
+            'calle' => ['nullable', 'string', 'max:30'],
+            'ciudad_nacimiento' => ['nullable', 'string', 'max:30'],
+            'dpto' => ['nullable', 'string', 'max:5'],
+            'piso' => ['nullable', 'integer', 'between:0,15'],
+            'estado_civil' => ['nullable', 'integer', 'between:0,5'],
+            'email' => ['required', 'email', 'max:50'],
+            'nombre_institucion_secundario' => ['nullable', 'string', 'max:255'],
+            'titulo_anterior' => ['nullable', 'string', 'max:255'],
+            'becas' => ['nullable', 'integer', 'between:0,9'],
             'observaciones' => ['nullable'],
-            'telefono1' => ['nullable','numeric'],
-            'telefono2' => ['nullable','numeric'],
-            'telefono3' => ['nullable','numeric'],
-            'codigo_postal' => ['nullable','alpha_num']
+            'telefono_1' => ['required', new Telefono],
+            'telefono_2' => ['nullable', new Telefono],
+            'codigo_postal' => ['nullable', 'alpha_num', 'max:10'],
+            'titulo_secundario' => ['required', 'integer', 'between:0,4'],
+            'lugar_nacimiento' => ['nullable', 'string', 'max:30'],
+            'casa_numero' => ['nullable', 'numeric'],
+            // luar de nacimiento, determinar si contiene espacios, limite de caracteres y ademas copiarlo tal cual en EditarAlumnooRequest.
         ];
     }
+
     public function messages()
     {
         return [

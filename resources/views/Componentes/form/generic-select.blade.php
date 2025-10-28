@@ -1,36 +1,29 @@
-
 @php
     $default = '';
-    $id = '';
 
-    if($item && isset($item->$name)){
-        if(isset($options['default'])){
-            $default = old($name)?old($name):$options['default'];
-        }else{
-            $default = $item->$name;
-        }
-    }else{
-        if(isset($options['default'])){
-            $default = old($name)?old($name):$options['default'];
-        }else{
-            $default = old($name)?old($name):'';
-        }
+    // Determinar el valor por defecto como string
+    if ($item && isset($item->$name)) {
+        $rawDefault = $options['default'] ?? $item->$name;
+        $default = old($name, is_array($rawDefault) ? '' : $rawDefault);
+    } else {
+        $rawDefault = $options['default'] ?? '';
+        $default = old($name, is_array($rawDefault) ? '' : $rawDefault);
     }
 
-    if(isset($options['id'])){
-        $id = $options['id'];
-    }
-    
+    // Asegurar que $optionsE sea iterable
+    $optionsE = is_iterable($optionsE ?? null) ? $optionsE : [];
+
+    // ID del campo
+    $id = $options['id'] ?? '';
 @endphp
 
-<div class="{{$class}}">
+<div class="{{ is_array($class) ? implode(' ', $class) : $class }}">
 
-    <label>{{$label}}</label>
+    <label>{{ $label }}</label>
 
-    <select id="{{$id}}" name="{{$name}}" class="{{$options['inputclass']}}">
-        @foreach ($optionsE as $key=>$value)
-            <option @selected($default==$key) value="{{$key}}">{{$value}}</option>
+    <select id="{{ $id }}" name="{{ $name }}" class="{{ $options['inputclass'] ?? '' }}">
+        @foreach ($optionsE as $key => $value)
+            <option @selected((string) $default === (string) $key) value="{{ $key }}">{{ $value }}</option>
         @endforeach
     </select>
-
 </div>

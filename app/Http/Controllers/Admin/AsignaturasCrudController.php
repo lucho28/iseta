@@ -2,49 +2,53 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\BaseController;
 use App\Http\Requests\CrearAsignaturaRequest;
-use App\Http\Requests\EditarAsignaturaRequest;
 use App\Models\Asignatura;
 use App\Models\Carrera;
-use App\Models\Configuracion;
+use App\Repositories\Admin\AsignaturaRepository;
 use Illuminate\Http\Request;
 
-class AsignaturasCrudController extends Controller
+class AsignaturasCrudController extends BaseController
 {
-    
-    function __construct()
+    public $asignaturasRepo;
+
+    public $mensajes = ['mensaje' => [], 'error' => [], 'aviso' => []];
+
+    public function __construct(AsignaturaRepository $asignaturasRepo)
     {
-        $this -> middleware('auth:admin');
+        $this->middleware('auth:admin');
+        $this->asignaturasRepo = $asignaturasRepo;
     }
 
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
-    {       
-         $asignaturas = [];
-         $filtro = "";
-         $porPagina = Configuracion::get('filas_por_tabla',true);
+    {
+        $filters = $request->all();
+        $carreraId = $filters['filter_carrera_id'] ?? null;
 
-
-        if($request->has('filtro')){
-            $filtro = $request->filtro;
-
-            if(strpos($filtro, ':')){
-                $arr = explode(':',$filtro);
-                $campo = $arr[0];
-                $keyword = $arr[1];
-                $asignaturas = Asignatura::where($campo,'LIKE','%'.$keyword.'%') -> paginate($porPagina);
-            }else{
-                
-                $asignaturas = Asignatura::where('nombre','LIKE','%'.$filtro.'%')
-                    -> paginate($porPagina);
-            }   
-        }else{
-            $asignaturas = Asignatura::select('*')->with('carrera')->paginate($porPagina);
+        // Asignaturas para el dropdown del select
+        if ($carreraId && $carreraId != 0) {
+            // Solo las asignaturas de esa carrera
+            $asignaturasList = Asignatura::whereHas('carrera', function ($q) use ($carreraId) {
+                $q->where('id', $carreraId);
+            })->orderBy('nombre')->get();
+        } else {
+            // Todas las asignaturas
+            $asignaturasList = Asignatura::orderBy('nombre')->get();
         }
-        return view('Admin.Asignaturas.index',['asignaturas'=>$asignaturas, 'filtro'=>$filtro]);
+
+        // Aplicar filtros al repositorio
+        $asignaturas = $this->asignaturasRepo->filter($filters);
+        $request->flash();
+
+        return view('Admin.Asignaturas.index', [
+            'filters' => $filters,
+            'asignaturas' => $asignaturas,
+            'asignaturasList' => $asignaturasList,
+        ]);
     }
 
     /**
@@ -52,10 +56,8 @@ class AsignaturasCrudController extends Controller
      */
     public function create(Request $request)
     {
-        $carreras = Carrera::orderBy('nombre')->get();
-        return view('Admin.Asignaturas.create',[
-            'carreras'=>$carreras,
-            'id_carrera'=>$request->id_carrera? $request->id_carrera:null 
+        return view('Admin.Asignaturas.create', [
+            'asignatura' => null,
         ]);
     }
 
@@ -66,53 +68,24 @@ class AsignaturasCrudController extends Controller
     {
         $data = $request->validated();
 
-        if(!Carrera::where('id', $data['id_carrera'])->exists()){
-            return redirect()->back()->with('error','La carrera seleccionada no existe'); 
+        // Verificar unicidad contextual
+        $existe = Asignatura::where('nombre', $data['nombre'])
+            ->where('carga_horaria', $data['carga_horaria'])
+            ->where('anio', 0)// dejar carga_horaria en estos datos aunque se usen "cantidad de modulos" ya que se usa "carga_horaria" en la base de datos
+            ->exists();
+
+        if ($existe) {
+            return redirect()->back()
+                ->withErrors(['nombre' => 'Ya existe una asignatura con ese nombre y cantidad de módulos'])
+                ->withInput();
         }
 
+        // Generar clave única
+        $data['clave_unica'] = \Str::uuid(); // o lógica propia
 
         Asignatura::create($data);
 
-        return redirect()->back()->with('mensaje','Se creo la asignatura');
-    }
-
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Request $request, $asignatura)
-    {
-        $config=Configuracion::todas();
-
-            $asignatura = Asignatura::with('cursadas.alumno')->find($asignatura);
-
-            $alumnos = $asignatura->cursantes();
-
-            $correlativas = Asignatura::where('id_carrera', $asignatura->carrera->id)
-                ->where('anio', '>=', $asignatura->anio);
-
-
-        return view('Admin.Asignaturas.edit', [
-            'asignatura' => $asignatura,
-            // 'alumnos' => $alumnos
-        ]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(EditarAsignaturaRequest $request, Asignatura $asignatura)
-    {
-        $data = $request->validated();
-        $asignatura->update($data);
-
-        if($request->has('redirect'))
-            return redirect()->to($request->input('redirect'))->with('mensaje','Se edito la asignatura');
-        else
-            return redirect()->back()->with('mensaje','Se edito la asignatura');
-        
-
-        //return redirect()->back()->with('mensaje','Se edito la asignatura');
+        return redirect()->back()->with('mensaje', 'Se creó la asignatura correctamente.');
     }
 
     /**
@@ -120,7 +93,39 @@ class AsignaturasCrudController extends Controller
      */
     public function destroy(Asignatura $asignatura)
     {
-        $asignatura->delete();
-        return redirect() -> route('admin.carreras.edit',['carrera' => $asignatura->id_carrera]) -> with('mensaje', 'Se ha eliminado la asignatura');
+        try {
+
+            // Verificar si la asignatura está vinculada a alguna carrera vigente
+            $carrerasVigentes = $asignatura->carrera->filter(fn($c) => $c->vigente);
+
+            if ($carrerasVigentes->isNotEmpty()) {
+                return redirect()->back()->with('error', 'No se pudo eliminar la asignatura porque está vinculada a una carrera vigente.');
+            }
+
+            // Verificar si la asignatura tiene relaciones con cursadas
+            if ($asignatura->cursadas()->exists()) {
+            return redirect()->back()->with('error', 'No se pudo eliminar la asignatura porque tiene cursadas asociadas.');
+            }
+
+            // Verificar si la asignatura tiene relaciones con materias correlativas
+            if ($asignatura->correlativasReverse()->exists()) {
+            return redirect()->back()->with('error', 'No se pudo eliminar la asignatura porque tiene materias correlativas asociadas.');
+            }
+
+            // Verificar si la asignatura tiene relaciones con mesas
+            if ($asignatura->mesas()->exists()) {
+            return redirect()->back()
+            ->with('error', 'No se pudo eliminar la asignatura porque tiene mesas asociadas.');
+            }
+
+            // Si no tiene relaciones bloqueantes, procedemos a eliminarla
+            $asignatura->delete();
+
+            return redirect()->back()
+            ->with('mensaje', 'Se ha eliminado la asignatura');
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'No se pudo eliminar la asignatura');
+        }
     }
 }

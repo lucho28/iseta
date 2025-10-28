@@ -3,45 +3,102 @@
 namespace App\Repositories\Admin;
 
 use App\Models\Carrera;
+
+use App\Models\CarreraAsignatura;
+use App\Models\CarreraAsignaturaProfesor;
 use App\Models\Configuracion;
+use PhpParser\Node\Expr\FuncCall;
+use Illuminate\Support\Facades\Log;
 
 
-class CarreraRepository{
+class CarreraRepository
+{
 
     public $config;
-    public $availableFiels = ['nombre','asignatura'];
+    public $availableFiels = ['nombre', 'asignatura', 'resolucion'];
 
-    public function __construct() {
+    public function __construct()
+    {
         $this->config = Configuracion::todas();
     }
+    public function index($request)
+{
+   $filterVigente = $request->input('filter_vigente', '');
+    $resolucionNumero      = $request->input('filter_resolucion_numero');
+    $resolucionAnio        = $request->input('filter_resolucion_anio');
+    $filterNombre = $request->input('filter_nombre');
+    $filterResolucion = $request->input('filter_resolucion');
+    $hasSearch             = $request->filled('filter_search_box') && $request->filled('filter_field');
+    $query                 = Carrera::with('asignaturas');
 
-    function index($request){
-        $idsQuery = Carrera::select('carreras.id')
-            ->leftJoin('asignaturas','asignaturas.id_carrera', 'carreras.id');
+    // 🔍 Filtro de búsqueda general
+    if ($hasSearch) {
+        $word  = trim($request->input('filter_search_box'));
+        $field = $request->input('filter_field');
 
-        if($request->has('filter_vigente') && $request->input('filter_vigente') != 0){
-            $value = $request->input('filter_vigente');
-            $idsQuery->where('carreras.vigente', $value-1);
-        }
+       switch ($field) {
 
-        if($request->has('filter_search_box') && ''!=$request->input('filter_search_box') && in_array($request->input('filter_field'),$this->availableFiels)){
-            $word = str_replace(' ','%',$request->input('filter_search_box'));
-            if($request->input('filter_field') == 'asignatura'){
-                $idsQuery->where('asignaturas.nombre','LIKE','%'.$word.'%');
-            }else{
-                $idsQuery->where('carreras.'.$request->input('filter_field'), 'LIKE', '%'.$request->input('filter_search_box').'%');
+    case 'resolucion_numero':
+        $query->whereRaw("SUBSTRING_INDEX(carreras.resolucion, '/', 1) LIKE ?", ["%{$word}%"]);
+        break;
+
+    case 'resolucion_anio':
+        $query->whereRaw("SUBSTRING_INDEX(carreras.resolucion, '/', -1) LIKE ?", ["%{$word}%"]);
+        break;
+
+    case 'nombre':
+    default:
+        $tokens = array_filter(array_map('trim', preg_split('/[^\p{L}\p{N}]+/u', $word)));
+        $query->where(function ($sub) use ($tokens) {
+            foreach ($tokens as $t) {
+                if (mb_strlen($t) < 2) continue;
+                $sub->whereRaw("carreras.nombre COLLATE utf8mb4_unicode_ci LIKE ?", ["%{$t}%"]);
             }
-        }
-
-        $ids = $idsQuery->distinct()->get()->pluck('id');
-
-        $carreras = Carrera::select('carreras.*')->whereIn('carreras.id', $ids)
-        ->orderBy('nombre')
-        ->paginate($this->config['filas_por_tabla']); 
-
-        
-        return $carreras;
+        });
+        break;
+}
 
     }
 
+    
+   if ($filterVigente === '0' || $filterVigente === '1') {
+    $query->where('carreras.vigente', (int)$filterVigente);
+} elseif ($filterVigente === '') {
+    $query->where('carreras.vigente', 1); // Por defecto, solo vigentes
+}
+
+if (!empty($filterNombre)) {
+    $query->where('carreras.nombre', $filterNombre);
+}
+
+if (!empty($filterResolucion)) {
+    $query->where('carreras.resolucion', $filterResolucion);
+}
+    if (!empty($resolucionNumero)) {
+        $query->whereRaw("SUBSTRING_INDEX(carreras.resolucion, '/', 1) LIKE ?", ["%{$resolucionNumero}%"]);
+    }
+
+    if (!empty($resolucionAnio)) {
+        $query->whereRaw("SUBSTRING_INDEX(carreras.resolucion, '/', -1) LIKE ?", ["%{$resolucionAnio}%"]);
+    }
+
+    
+    $query->orderByDesc('carreras.vigente')
+          ->orderByDesc('carreras.anio_apertura')
+          ->orderBy('carreras.nombre');
+
+    return $query->paginate($this->config['filas_por_tabla']);
+}
+    public function setAsignatura($asignatura, $carrera)
+    {
+        // Implement logic to associate asignatura with carrera if needed
+        // Example: return $carrera->asignaturas()->attach($asignatura->id);
+    }
+
+    public function GETresolucion($carrera)
+    {
+        return Carrera::where('id', $carrera->id)
+            ->select('nombre', 'resolucion', 'vigente', 'resolucion_archivo')
+            ->first();
+    }
 }
